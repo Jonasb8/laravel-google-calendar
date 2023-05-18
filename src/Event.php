@@ -58,17 +58,17 @@ class Event
      *
      * @return mixed
      */
-    public static function create(array $properties, string $calendarId = null, $optParams = [])
+    public static function create(array $properties, string $calendarId = null, $optParams = [], $userToImpersonate = null)
     {
         $event = new static;
 
-        $event->calendarId = static::getGoogleCalendar($calendarId)->getCalendarId();
+        $event->calendarId = static::getGoogleCalendar($calendarId, $userToImpersonate)->getCalendarId();
 
         foreach ($properties as $name => $value) {
             $event->$name = $value;
         }
 
-        return $event->save('insertEvent', $optParams);
+        return $event->save('insertEvent', $optParams, $userToImpersonate);
     }
 
     public static function quickCreate(string $text)
@@ -82,7 +82,7 @@ class Event
 
     public static function get(CarbonInterface $startDateTime = null, CarbonInterface $endDateTime = null, array $queryParameters = [], string $calendarId = null): Collection
     {
-        $googleCalendar = static::getGoogleCalendar($calendarId);
+        $googleCalendar = static::getGoogleCalendar($calendarId, $calendarId);
 
         $googleEvents = $googleCalendar->listEvents($startDateTime, $endDateTime, $queryParameters);
 
@@ -112,9 +112,9 @@ class Event
             ->values();
     }
 
-    public static function find($eventId, string $calendarId = null): self
+    public static function find($eventId, string $calendarId = null, $userToImpersonate = null): self
     {
-        $googleCalendar = static::getGoogleCalendar($calendarId);
+        $googleCalendar = static::getGoogleCalendar($calendarId, $userToImpersonate);
 
         $googleEvent = $googleCalendar->getEvent($eventId);
 
@@ -178,11 +178,11 @@ class Event
         return is_null($this->googleEvent['start']['dateTime']);
     }
 
-    public function save(string $method = null, $optParams = []): self
+    public function save(string $method = null, $optParams = [], $userToImpersonate = null): self
     {
         $method = $method ?? ($this->exists() ? 'updateEvent' : 'insertEvent');
 
-        $googleCalendar = $this->getGoogleCalendar($this->calendarId);
+        $googleCalendar = $this->getGoogleCalendar($this->calendarId, $userToImpersonate);
 
         if ($this->hasMeetLink) {
             $optParams['conferenceDataVersion'] = 1;
@@ -202,18 +202,18 @@ class Event
         return static::createFromGoogleCalendarEvent($googleEvent, $googleCalendar->getCalendarId());
     }
 
-    public function update(array $attributes, $optParams = []): self
+    public function update(array $attributes, $optParams = [], $userToImpersonate = null): self
     {
         foreach ($attributes as $name => $value) {
             $this->$name = $value;
         }
 
-        return $this->save('updateEvent', $optParams);
+        return $this->save('updateEvent', $optParams, $userToImpersonate);
     }
 
-    public function delete(string $eventId = null, $optParams = [])
+    public function delete(string $eventId = null, $optParams = [], $userToImpersonate = null)
     {
-        $this->getGoogleCalendar($this->calendarId)->deleteEvent($eventId ?? $this->id, $optParams);
+        $this->getGoogleCalendar($this->calendarId, $userToImpersonate)->deleteEvent($eventId ?? $this->id, $optParams);
     }
 
     public function addAttendee(array $attendee)
@@ -261,11 +261,11 @@ class Event
         return $this->calendarId;
     }
 
-    protected static function getGoogleCalendar(string $calendarId = null): GoogleCalendar
+    protected static function getGoogleCalendar(string $calendarId = null, $userToImpersonate = null): GoogleCalendar
     {
         $calendarId = $calendarId ?? config('google-calendar.calendar_id');
 
-        return GoogleCalendarFactory::createForCalendarId($calendarId);
+        return GoogleCalendarFactory::createForCalendarId($calendarId, $userToImpersonate);
     }
 
     protected function setDateProperty(string $name, CarbonInterface $date)

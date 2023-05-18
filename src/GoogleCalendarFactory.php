@@ -8,23 +8,24 @@ use Spatie\GoogleCalendar\Exceptions\InvalidConfiguration;
 
 class GoogleCalendarFactory
 {
-    public static function createForCalendarId(string $calendarId): GoogleCalendar
+    public static function createForCalendarId(string $calendarId, $userToImpersonate = null): GoogleCalendar
     {
         $config = config('google-calendar');
+        $config['user_to_impersonate'] = $userToImpersonate;
 
-        $client = self::createAuthenticatedGoogleClient($config);
+        $client = self::createAuthenticatedGoogleClient($config, $userToImpersonate);
 
         $service = new Google_Service_Calendar($client);
 
         return self::createCalendarClient($service, $calendarId);
     }
 
-    public static function createAuthenticatedGoogleClient(array $config): Google_Client
+    public static function createAuthenticatedGoogleClient(array $config, $userToImpersonate = null): Google_Client
     {
         $authProfile = $config['default_auth_profile'];
 
         if ($authProfile === 'service_account') {
-            return self::createServiceAccountClient($config['auth_profiles']['service_account']);
+            return self::createServiceAccountClient($config['auth_profiles']['service_account'], $userToImpersonate);
         }
         if ($authProfile === 'oauth') {
             return self::createOAuthClient($config['auth_profiles']['oauth']);
@@ -33,7 +34,7 @@ class GoogleCalendarFactory
         throw InvalidConfiguration::invalidAuthenticationProfile($authProfile);
     }
 
-    protected static function createServiceAccountClient(array $authProfile): Google_Client
+    protected static function createServiceAccountClient(array $authProfile, $userToImpersonate = null): Google_Client
     {
         $client = new Google_Client;
 
@@ -43,8 +44,8 @@ class GoogleCalendarFactory
 
         $client->setAuthConfig($authProfile['credentials_json']);
 
-        if (config('google-calendar')['user_to_impersonate']) {
-            $client->setSubject(config('google-calendar')['user_to_impersonate']);
+        if ($userToImpersonate !== null) {
+            $client->setSubject($userToImpersonate);
         }
 
         return $client;
